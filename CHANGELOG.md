@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0
 
 The first release: GaiaDesk's built-in help desk for React Native apps, over the iOS
 (`GaiaDeskEmbed` pod) and Android (`net.gaiadesk:embed-android`) embed SDKs.
