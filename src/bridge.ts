@@ -24,6 +24,7 @@ export function reactNativeBridge(): Bridge {
         stop: (tag) => spec.stop(tag),
         setMaskedRects: (tag, rects) => spec.setMaskedRects(tag, rects),
         setPaused: (tag, paused) => spec.setPaused(tag, paused),
+        setSecretFocus: (secret) => spec.setSecretFocus(secret),
         requestConsent: (company, guided, capture) => spec.requestConsent(company, guided, capture),
         recordConsent: (company, guided, capture) => spec.recordConsent(company, guided, capture),
         buildInfo: () => spec.buildInfo(),

@@ -113,6 +113,11 @@ RCT_EXPORT_METHOD(setMaskedRects : (double)tag rects : (NSArray *)rects resolve 
   [_impl setMaskedRects:(NSInteger)tag rects:numbers resolve:resolve reject:rejecter(reject)];
 }
 
+RCT_EXPORT_METHOD(setSecretFocus : (BOOL)secret)
+{
+  [_impl setSecretFocus:secret];
+}
+
 RCT_EXPORT_METHOD(setPaused : (double)tag paused : (BOOL)paused)
 {
   [_impl setPaused:(NSInteger)tag paused:paused];

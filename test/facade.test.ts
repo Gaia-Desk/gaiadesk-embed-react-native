@@ -47,6 +47,9 @@ function fake(platform = 'ios', linked = true): Fake {
     setPaused: (tag, paused) => {
       f.calls.push(['setPaused', tag, paused]);
     },
+    setSecretFocus: (secret) => {
+      f.calls.push(['setSecretFocus', secret]);
+    },
     requestConsent: async (company, guided, capture) => {
       f.calls.push(['requestConsent', company, guided, capture]);
       return f.consentAnswer;
@@ -353,5 +356,39 @@ test('a scroll (or any trigger) re-measures the masks at once, coalesced, not on
     assert.equal(measures, 3, 'no session: nothing measured');
   } finally {
     maskRegistry.unregister(id);
+  }
+});
+
+test('setSecretFocus tells the native SDK (strictly a boolean)', () => {
+  const f = fake('ios');
+  GaiaDeskEmbed.setSecretFocus(true);
+  GaiaDeskEmbed.setSecretFocus(false);
+  GaiaDeskEmbed.setSecretFocus('yes' as never);
+  assert.deepEqual(f.calls, [
+    ['setSecretFocus', true],
+    ['setSecretFocus', false],
+    ['setSecretFocus', false],
+  ]);
+});
+
+test('while a session runs the masks follow every animation frame, with no wiring by the app', async () => {
+  const g = globalThis as { requestAnimationFrame?: (cb: () => void) => unknown };
+  const had = g.requestAnimationFrame;
+  g.requestAnimationFrame = (cb) => setTimeout(cb, 2);
+  const f = fake('ios');
+  let y = 100;
+  const id = maskRegistry.register(async () => ({ x: 0, y, w: 50, h: 20 }));
+  try {
+    const s = await GaiaDeskEmbed.start(opts, await yes(f));
+    y = 420; // a fling in a plain ScrollView: no layout, no onScroll wired
+    await new Promise((r) => setTimeout(r, 40)); // well under the 500 ms poll
+    const pushed = f.calls.filter((c) => c[0] === 'setMaskedRects').at(-1);
+    assert.deepEqual(pushed?.[2], [0, 420, 50, 20], 'followed within a few frames');
+    s.stop();
+    f.emit(s.tag, { type: 'ended', reason: 'app_stopped' });
+  } finally {
+    maskRegistry.unregister(id);
+    if (had) g.requestAnimationFrame = had;
+    else delete g.requestAnimationFrame;
   }
 });

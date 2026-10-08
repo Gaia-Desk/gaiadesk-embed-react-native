@@ -11,6 +11,7 @@ import type { LayoutChangeEvent, ViewProps } from 'react-native';
 import type { Rect } from './config.ts';
 import { maskRegistry } from './maskRegistry.ts';
 import { requestMaskRefresh } from './embed.ts';
+import { useMaskScroll } from './scroll.tsx';
 
 /** Anything with `measureInWindow` (every host component instance). */
 export interface Measurable {
@@ -85,6 +86,8 @@ export function useGaiaDeskMask(): GaiaDeskMask {
  */
 export function GaiaDeskMasked(props: ViewProps): React.JSX.Element {
   const { ref, onLayout: measure } = useGaiaDeskMask();
+  // Inside a GaiaDesk scroll container: re-measured on each of its scrolls.
+  useMaskScroll(measure);
   const { onLayout } = props;
   const layout = useCallback(
     (e: LayoutChangeEvent) => {

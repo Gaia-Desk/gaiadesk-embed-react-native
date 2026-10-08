@@ -40,7 +40,32 @@ let poll: ReturnType<typeof setInterval> | null = null;
 /** How often marked views are measured again while a session runs (scrolls move them silently). */
 export const MASK_REFRESH_MS = 500;
 
+let following = false;
+
+/**
+ * While a session runs, the marked views are measured again on every
+ * animation frame (one measurement in flight at a time): a scroll, a
+ * momentum fling or an animation anywhere in the app moves them without a
+ * layout, and no wiring by the app is needed. The 500 ms poll stays as a
+ * backstop (and where there is no requestAnimationFrame).
+ */
+function followFrames(): void {
+  const raf = (globalThis as { requestAnimationFrame?: (cb: () => void) => unknown }).requestAnimationFrame;
+  if (following || typeof raf !== 'function') return;
+  following = true;
+  const step = (): void => {
+    if (sessions.size === 0) {
+      following = false;
+      return;
+    }
+    if (!refreshing) requestMaskRefresh();
+    raf(step);
+  };
+  raf(step);
+}
+
 function pollMasks(): void {
+  followFrames();
   if (poll) return;
   poll = setInterval(() => {
     if (sessions.size === 0) stopPolling();
@@ -259,6 +284,18 @@ export class GaiaDeskEmbed {
     } catch (e) {
       throw EmbedError.from(e);
     }
+  }
+
+  /**
+   * Focus entered (true) or left (false) a secret field (a PIN, a one-time
+   * code, a password field of your own): while true, the agent's guided
+   * typing and keys are refused (`masked`). `<GaiaDeskSecretInput>` and
+   * `useGaiaDeskSecretFocus()` call it for you.
+   */
+  static setSecretFocus(secret: boolean): void {
+    const b = currentBridge();
+    mobilePlatform(b.platform);
+    linked(b).setSecretFocus(secret === true);
   }
 
   /** The session running in this app (the last one started that has not ended), if any. */

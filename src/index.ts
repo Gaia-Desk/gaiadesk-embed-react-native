@@ -27,4 +27,7 @@ export { nativeConfig } from './config.ts';
 export type { Capture, CaptureMethod, Consent, ConsentOptions, EmbedOptions, Rect } from './config.ts';
 export { GaiaDeskMasked, measureRect, refreshMasks, useGaiaDeskMask } from './masks.tsx';
 export type { GaiaDeskMask, Measurable } from './masks.tsx';
+export { GaiaDeskScrollView, useGaiaDeskScroll, MaskScrollContext } from './scroll.tsx';
+export type { MaskScrollChannel } from './scroll.tsx';
+export { GaiaDeskSecretInput, useGaiaDeskSecretFocus } from './secret.tsx';
 export type { Bridge, NativeEmbedModule } from './native.ts';

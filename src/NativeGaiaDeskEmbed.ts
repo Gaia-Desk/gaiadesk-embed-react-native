@@ -11,6 +11,7 @@ export interface Spec extends TurboModule {
   stop(tag: number): void;
   setMaskedRects(tag: number, rects: Array<number>): Promise<void>;
   setPaused(tag: number, paused: boolean): void;
+  setSecretFocus(secret: boolean): void;
   requestConsent(company: string, guided: boolean, capture: string): Promise<string>;
   recordConsent(company: string, guided: boolean, capture: string): Promise<string>;
   buildInfo(): Promise<string>;

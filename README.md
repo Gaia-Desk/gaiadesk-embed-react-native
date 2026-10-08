@@ -126,14 +126,23 @@ them.
   earlier set; `[]` clears it. Marked views stay masked on top.
 
 Marked views are measured with `measureInWindow` when they lay out, right before `start` (so they
-cover the very first frame), again at once on any marked view's layout, the keyboard, a rotation or
-the app coming back, and every 500 ms while a session runs. A scroll moves views without a layout:
-give your `ScrollView` / `FlatList` `onScroll={maskedOnScroll(yourHandler)}` (and
-`scrollEventThrottle={16}`) so the masks inside it follow at once; `requestMaskRefresh()` does the
-same from anywhere. A marked view that has not been measured yet (still mounting, or its
+cover the very first frame), and then on **every animation frame** while a session runs (one
+measurement in flight at a time): scrolls, flings and animations anywhere move the masks with them,
+with nothing to wire. Layouts, the keyboard, a rotation and the app coming back also re-measure at
+once, and a 500 ms poll stays as a backstop. `<GaiaDeskScrollView>` (or `useGaiaDeskScroll()` for a
+FlatList) re-measures the marked views inside it on each scroll event as well;
+`requestMaskRefresh()` / `maskedOnScroll()` do the same from anywhere. A marked view that has not been measured yet (still mounting, or its
 measurement did not answer) masks the **whole** picture until it is: masks fail closed. Units are React Native
 layout units: points on iOS (what the SDK takes), dp on Android (the native module multiplies by the
 display density and adds the visible frame's offset in the window, rounding outward).
+
+### Secret fields
+
+Password fields (`secureTextEntry`) are masked by the SDK and guided typing into them is refused.
+For other secrets (a PIN or one-time code shown in clear, a custom field) use
+`<GaiaDeskSecretInput>` (a TextInput) or spread `useGaiaDeskSecretFocus()`'s `onFocus`/`onBlur`
+on your own: while it has focus, the agent's typing and keys are refused (`masked`).
+`GaiaDeskEmbed.setSecretFocus(bool)` is the call underneath.
 
 ## Guided mode
 
@@ -190,7 +199,8 @@ Without them the session fails with `capture_failed`. Pass `capture: "screen"` t
 | `GaiaDeskEmbed.recordConsent(company, { guided?, capture? })` | `Promise<Consent>`: your own dialog's YES |
 | `GaiaDeskEmbed.buildInfo()` | `Promise<{ version, testSource, codec, os, arch }>` of the native library |
 | `GaiaDeskEmbed.current` | the running session, if any |
-| `<GaiaDeskMasked>`, `useGaiaDeskMask()`, `refreshMasks()`, `maskedOnScroll()`, `requestMaskRefresh()` | masking (above) |
+| `<GaiaDeskMasked>`, `useGaiaDeskMask()`, `refreshMasks()`, `<GaiaDeskScrollView>`, `useGaiaDeskScroll()`, `maskedOnScroll()`, `requestMaskRefresh()` | masking (above) |
+| `<GaiaDeskSecretInput>`, `useGaiaDeskSecretFocus()`, `GaiaDeskEmbed.setSecretFocus(secret)` | secret fields (above) |
 
 | Option | |
 |---|---|

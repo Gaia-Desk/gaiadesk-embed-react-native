@@ -15,6 +15,8 @@ public final class RNGaiaDeskEmbedImpl: NSObject {
     /// The running sessions by tag (main thread only). Kept until `ended`:
     /// the SDK object stops its session when released.
     private var sessions: [Int: GaiaDeskEmbed] = [:]
+    /// Focus is in a secret field (JS's word; main thread only).
+    private var secretFocus = false
 
     // MARK: - start / stop
 
@@ -42,6 +44,7 @@ public final class RNGaiaDeskEmbedImpl: NSObject {
                     let embed = try GaiaDeskEmbed.start(config, consent: consent) { [weak self] event in
                         self?.deliver(tag, event)
                     }
+                    embed.setSecretFocus(self.secretFocus)
                     self.sessions[tag] = embed
                     resolve(nil)
                 } catch let e as GaiaDeskEmbedError {
@@ -85,6 +88,14 @@ public final class RNGaiaDeskEmbedImpl: NSObject {
             } catch {
                 reject("bad_rects", "\(error)")
             }
+        }
+    }
+
+    /// Focus entered or left a secret field: every session (and the next) refuses guided typing meanwhile.
+    @objc public func setSecretFocus(_ secret: Bool) {
+        DispatchQueue.main.async {
+            self.secretFocus = secret
+            self.sessions.values.forEach { $0.setSecretFocus(secret) }
         }
     }
 

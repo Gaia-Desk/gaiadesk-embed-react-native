@@ -19,9 +19,9 @@
 // blue box and Buy are in it (layout units), for the end-to-end tests.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Linking, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, Linking, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { EmbedError, GaiaDeskEmbed, GaiaDeskMasked } from '@gaiadesk/embed-react-native';
+import { EmbedError, GaiaDeskEmbed, GaiaDeskMasked, GaiaDeskSecretInput } from '@gaiadesk/embed-react-native';
 import type { CaptureMethod, EmbedEvent, EmbedSession } from '@gaiadesk/embed-react-native';
 
 const COMPANY = 'Acme';
@@ -57,7 +57,8 @@ export default function App(): React.JSX.Element {
   const [status, setStatus] = useState(`Press Get help to share this app with ${COMPANY} support.`);
   const [bought, setBought] = useState(0);
   const help = useRef<EmbedSession | null>(null);
-  const boxes = useRef<Record<'card' | 'blue' | 'buy', View | null>>({ card: null, blue: null, buy: null });
+  type Box = 'card' | 'blue' | 'buy' | 'pin' | 'scroll' | 'note';
+  const boxes = useRef<Record<Box, View | TextInput | null>>({ card: null, blue: null, buy: null, pin: null, scroll: null, note: null });
 
   const onEvent = useCallback((e: EmbedEvent) => {
     emit(e);
@@ -101,13 +102,14 @@ export default function App(): React.JSX.Element {
   );
 
   useEffect(() => {
-    const box = (v: View | null): Promise<number[] | null> =>
+    const box = (v: View | TextInput | null): Promise<number[] | null> =>
       new Promise((resolve) => (v ? v.measureInWindow((x, y, w, h) => resolve([x, y, w, h])) : resolve(null)));
     // After the first layout: the boxes are measured in the window.
     const t = setTimeout(() => {
       const { width, height } = Dimensions.get('window');
-      Promise.all([GaiaDeskEmbed.buildInfo(), box(boxes.current.card), box(boxes.current.blue), box(boxes.current.buy)]).then(
-        ([build, card, blue, buy]) => emit({ type: 'demo', build, frame: [width, height], card, blue, buy }),
+      const b = boxes.current;
+      Promise.all([GaiaDeskEmbed.buildInfo(), box(b.card), box(b.blue), box(b.buy), box(b.pin), box(b.scroll), box(b.note)]).then(
+        ([build, card, blue, buy, pin, scroll, note]) => emit({ type: 'demo', build, frame: [width, height], card, blue, buy, pin, scroll, note }),
         (e: unknown) => emit({ type: 'demo', build_error: String(e) }),
       );
     }, 500);
@@ -173,6 +175,27 @@ export default function App(): React.JSX.Element {
         <Text style={styles.buttonText}>Get help</Text>
       </Pressable>
       <Text style={styles.status}>{status}</Text>
+      <View style={styles.row}>
+        {/* A PIN shown in clear: guided typing is refused while it has focus (setSecretFocus). */}
+        <GaiaDeskSecretInput ref={(v) => (boxes.current.pin = v)} style={styles.pin} secureTextEntry={false} placeholder="PIN" keyboardType="number-pad" />
+        {/* A plain ScrollView (nothing wired for the masks; onScroll only reports
+            the offset to the tests): its masked note follows the scroll. */}
+        <View ref={(v) => (boxes.current.scroll = v)} collapsable={false} style={styles.scrollBox}>
+          <ScrollView
+            style={styles.scroll}
+            scrollEventThrottle={100}
+            onScroll={(e) => emit({ scrolled: Math.round(e.nativeEvent.contentOffset.y) })}
+          >
+            <View style={styles.spacer} />
+            <View ref={(v) => (boxes.current.note = v)} collapsable={false}>
+              <GaiaDeskMasked style={styles.note}>
+                <Text style={styles.cardText}>Note: 1234</Text>
+              </GaiaDeskMasked>
+            </View>
+            <View style={styles.tall} />
+          </ScrollView>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -188,4 +211,10 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 17, color: 'black' },
   input: { marginTop: 16, height: 44, backgroundColor: 'white', paddingHorizontal: 10, borderRadius: 6 },
   status: { marginTop: 16, color: 'black' },
+  pin: { width: 120, height: 44, backgroundColor: 'white', paddingHorizontal: 10, borderRadius: 6, marginRight: 10 },
+  scrollBox: { width: 180, height: 160 },
+  scroll: { backgroundColor: 'yellow' },
+  spacer: { height: 70 },
+  note: { width: 180, height: 50, backgroundColor: 'red', justifyContent: 'center', alignItems: 'center' },
+  tall: { height: 800 },
 });

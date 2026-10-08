@@ -15,6 +15,8 @@ export interface NativeEmbedModule {
   stop(tag: number): void;
   /** Replace session `tag`'s masks: flat `[x, y, w, h, …]` in layout units. */
   setMaskedRects(tag: number, rects: number[]): Promise<void>;
+  /** Focus is (true) or is no longer (false) in a secret field: guided typing refused. */
+  setSecretFocus(secret: boolean): void;
   /** Pause (or resume) guided input. */
   setPaused(tag: number, paused: boolean): void;
   /**
