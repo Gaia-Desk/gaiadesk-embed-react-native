@@ -18,6 +18,9 @@ class GaiaDeskEmbedModule(context: ReactApplicationContext) : GaiaDeskEmbedSpec(
     /** The running sessions by tag (main thread only), kept until `ended`. */
     private val sessions = HashMap<Int, GaiaDeskEmbed>()
 
+    /** What JS last said about keyboard focus (setSecretFocus): for the running and the next sessions. */
+    private var secretFocus: Boolean? = null
+
     override fun getName(): String = NAME
 
     /**
@@ -41,7 +44,9 @@ class GaiaDeskEmbedModule(context: ReactApplicationContext) : GaiaDeskEmbedSpec(
                     return@runOnUiThread
                 }
                 val consent = GaiaDeskEmbed.consent(token, config.company, config.guided, config.capture)
-                sessions[t] = GaiaDeskEmbed.start(activity, config, consent) { e -> deliver(t, e) }
+                val embed = GaiaDeskEmbed.start(activity, config, consent) { e -> deliver(t, e) }
+                secretFocus?.let { embed.setSecretFocus(it) }
+                sessions[t] = embed
                 promise.resolve(null)
             } catch (e: GaiaDeskEmbedException) {
                 promise.reject(e.code, e.message, e)
@@ -76,6 +81,18 @@ class GaiaDeskEmbedModule(context: ReactApplicationContext) : GaiaDeskEmbedSpec(
             } catch (e: GaiaDeskEmbedException) {
                 promise.reject(e.code, e.message, e)
             }
+        }
+    }
+
+    /**
+     * Keyboard focus entered (true) or left (false) a secret field: the whole RN UI is one Android
+     * View, so the SDK cannot see which field has focus. While true, guided typing is refused.
+     */
+    @ReactMethod
+    override fun setSecretFocus(secret: Boolean) {
+        UiThreadUtil.runOnUiThread {
+            secretFocus = secret
+            sessions.values.forEach { it.setSecretFocus(secret) }
         }
     }
 

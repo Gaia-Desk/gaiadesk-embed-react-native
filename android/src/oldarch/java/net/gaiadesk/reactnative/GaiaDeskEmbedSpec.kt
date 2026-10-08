@@ -14,6 +14,7 @@ abstract class GaiaDeskEmbedSpec(context: ReactApplicationContext) : ReactContex
     abstract fun stop(tag: Double)
     abstract fun setMaskedRects(tag: Double, rects: ReadableArray, promise: Promise)
     abstract fun setPaused(tag: Double, paused: Boolean)
+    abstract fun setSecretFocus(secret: Boolean)
     abstract fun requestConsent(company: String, guided: Boolean, capture: String, promise: Promise)
     abstract fun recordConsent(company: String, guided: Boolean, capture: String, promise: Promise)
     abstract fun buildInfo(promise: Promise)
