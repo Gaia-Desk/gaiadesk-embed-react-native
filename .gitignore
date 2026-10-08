@@ -21,3 +21,5 @@ DerivedData/
 # The example's pods resolve GaiaDeskEmbed from a local path (GAIADESK_EMBED_IOS_PATH).
 example/ios/Podfile.lock
 example/ios/.xcode.env.local
+example/android/app/.cxx/
+example/android/.kotlin/

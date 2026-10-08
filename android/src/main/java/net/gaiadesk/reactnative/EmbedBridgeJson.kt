@@ -48,6 +48,10 @@ class MaskUnits(private val density: Float, private val offsetX: Float, private 
 object EmbedBridgeJson {
     private fun refuse(code: String, message: String): Nothing = throw GaiaDeskEmbedException(code, message)
 
+    /** The consent token the JS side put in the config, or null. */
+    fun consentToken(json: String): String? =
+        runCatching { JSONObject(json).optString("consent_token", "") }.getOrDefault("").takeIf { it.isNotEmpty() }
+
     /** The config JSON (see src/config.ts) → the SDK's Configuration. */
     fun configuration(json: String, units: MaskUnits): GaiaDeskEmbed.Configuration {
         val o = try {

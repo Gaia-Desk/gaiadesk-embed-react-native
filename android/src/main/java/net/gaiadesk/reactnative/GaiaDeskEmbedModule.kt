@@ -20,8 +20,12 @@ class GaiaDeskEmbedModule(context: ReactApplicationContext) : GaiaDeskEmbedSpec(
 
     override fun getName(): String = NAME
 
+    /**
+     * The user's consent travels inside [configJson] as `consent_token` (from requestConsent /
+     * recordConsent); the library refuses to start without it, or with one for another session.
+     */
     @ReactMethod
-    override fun start(tag: Double, configJson: String, consentGranted: Boolean, promise: Promise) {
+    override fun start(tag: Double, configJson: String, promise: Promise) {
         val t = tag.toInt()
         UiThreadUtil.runOnUiThread {
             val activity = reactApplicationContext.currentActivity
@@ -31,7 +35,13 @@ class GaiaDeskEmbedModule(context: ReactApplicationContext) : GaiaDeskEmbedSpec(
             }
             try {
                 val config = EmbedBridgeJson.configuration(configJson, MaskUnits.of(activity))
-                sessions[t] = GaiaDeskEmbed.start(activity, config, consentGranted) { e -> deliver(t, e) }
+                val token = EmbedBridgeJson.consentToken(configJson)
+                if (token == null) {
+                    promise.reject("consent_required", "consent_token is required: ask with requestConsent (or recordConsent after your own dialog)")
+                    return@runOnUiThread
+                }
+                val consent = GaiaDeskEmbed.consent(token, config.company, config.guided, config.capture)
+                sessions[t] = GaiaDeskEmbed.start(activity, config, consent) { e -> deliver(t, e) }
                 promise.resolve(null)
             } catch (e: GaiaDeskEmbedException) {
                 promise.reject(e.code, e.message, e)
@@ -75,23 +85,43 @@ class GaiaDeskEmbedModule(context: ReactApplicationContext) : GaiaDeskEmbedSpec(
         UiThreadUtil.runOnUiThread { sessions[t]?.setPaused(paused) }
     }
 
+    /** The library's dialog: resolves to the consent token, or "" when the user declined. */
     @ReactMethod
     override fun requestConsent(company: String, guided: Boolean, capture: String, promise: Promise) {
-        val cap = when (capture) {
-            "app" -> GaiaDeskEmbed.Capture.APP
-            "screen" -> GaiaDeskEmbed.Capture.SCREEN
-            else -> {
-                promise.reject("bad_config", "capture \"$capture\" is not app or screen")
-                return
-            }
-        }
+        val cap = capture(capture, promise) ?: return
         UiThreadUtil.runOnUiThread {
             val activity = reactApplicationContext.currentActivity
             if (activity == null) {
                 promise.reject("no_activity", "no activity in front to show the consent dialog on")
                 return@runOnUiThread
             }
-            GaiaDeskEmbed.requestConsent(activity, company, guided, cap) { agreed -> promise.resolve(agreed) }
+            try {
+                GaiaDeskEmbed.requestConsent(activity, company, guided, cap) { consent -> promise.resolve(consent?.token ?: "") }
+            } catch (e: GaiaDeskEmbedException) {
+                promise.reject(e.code, e.message, e)
+            }
+        }
+    }
+
+    /** The app's own dialog said YES: the consent token for `start`. */
+    @ReactMethod
+    override fun recordConsent(company: String, guided: Boolean, capture: String, promise: Promise) {
+        val cap = capture(capture, promise) ?: return
+        try {
+            promise.resolve(GaiaDeskEmbed.recordConsent(company, guided, cap).token)
+        } catch (e: GaiaDeskEmbedException) {
+            promise.reject(e.code, e.message, e)
+        } catch (e: UnsatisfiedLinkError) {
+            promise.reject("not_linked", "libgaiadesk_embed is missing from this build: ${e.message}", e)
+        }
+    }
+
+    private fun capture(capture: String, promise: Promise): GaiaDeskEmbed.Capture? = when (capture) {
+        "app" -> GaiaDeskEmbed.Capture.APP
+        "screen" -> GaiaDeskEmbed.Capture.SCREEN
+        else -> {
+            promise.reject("bad_config", "capture \"$capture\" is not app or screen")
+            null
         }
     }
 
