@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing to declare: net.gaiadesk:embed-android brings INTERNET and its own
+  components. An app that opts into capture "screen" adds FOREGROUND_SERVICE
+  and FOREGROUND_SERVICE_MEDIA_PROJECTION to its own manifest (README).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

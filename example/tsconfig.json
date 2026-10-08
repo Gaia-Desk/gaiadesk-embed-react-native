@@ -1,0 +1,10 @@
+{
+  "extends": "@react-native/typescript-config/tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@gaiadesk/embed-react-native": ["../src/index.ts"]
+    }
+  },
+  "include": ["App.tsx", "index.ts"]
+}

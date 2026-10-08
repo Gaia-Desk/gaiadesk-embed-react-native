@@ -1,0 +1,20 @@
+node_modules/
+lib/
+*.tsbuildinfo
+.DS_Store
+
+# Android
+android/build/
+android/.gradle/
+android/.cxx/
+example/android/build/
+example/android/app/build/
+example/android/.gradle/
+local.properties
+
+# iOS
+ios/build/
+example/ios/build/
+example/ios/Pods/
+xcuserdata/
+DerivedData/

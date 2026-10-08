@@ -1,0 +1,61 @@
+{
+  "name": "@gaiadesk/embed-react-native",
+  "version": "0.1.0",
+  "description": "A \"Get help\" button for your React Native app: your customer agrees, and your support team sees the app's screen in the GaiaDesk console. Over GaiaDesk's iOS and Android embed SDKs.",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "source": "./src/index.ts",
+  "files": [
+    "src",
+    "lib",
+    "ios",
+    "android/build.gradle",
+    "android/gradle.properties",
+    "android/src",
+    "GaiaDeskEmbedReactNative.podspec",
+    "LICENSE",
+    "LICENSE-BINARY",
+    "README.md",
+    "CHANGELOG.md",
+    "!android/build",
+    "!ios/build"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0",
+    "react-native": ">=0.74.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "react": "18.3.1",
+    "react-native": "0.76.9",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "codegenConfig": {
+    "name": "RNGaiaDeskEmbedSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "net.gaiadesk.reactnative"
+    }
+  },
+  "homepage": "https://gaiadesk.net/docs/embed",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gaia-Desk/gaiadesk-embed-react-native.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": ["gaiadesk", "support", "help-desk", "screen-sharing", "cobrowse", "react-native", "ios", "android", "turbo-module"]
+}

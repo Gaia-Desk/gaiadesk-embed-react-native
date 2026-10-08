@@ -1,0 +1,32 @@
+{
+  "name": "gaiadesk-embed-react-native-example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Acme Bank: the @gaiadesk/embed-react-native example app.",
+  "scripts": {
+    "start": "react-native start",
+    "ios": "react-native run-ios",
+    "android": "react-native run-android",
+    "pods": "cd ios && pod install",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gaiadesk/embed-react-native": "file:..",
+    "react": "18.3.1",
+    "react-native": "0.76.9"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@react-native-community/cli": "15.0.1",
+    "@react-native-community/cli-platform-android": "15.0.1",
+    "@react-native-community/cli-platform-ios": "15.0.1",
+    "@react-native/babel-preset": "0.76.9",
+    "@react-native/metro-config": "0.76.9",
+    "@react-native/typescript-config": "0.76.9",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
