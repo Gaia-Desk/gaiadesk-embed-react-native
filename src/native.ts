@@ -6,18 +6,24 @@
 /** The native module, as both architectures expose it. */
 export interface NativeEmbedModule {
   /**
-   * Start a session labelled `tag` (every event of it carries the tag).
+   * Start a session labelled `tag` (every event of it carries the tag). The
+   * consent is the config's `consent_token` (refused without it).
    * Rejects with a code (`consent_required`, `bad_token`, `busy`, …).
    */
-  start(tag: number, configJson: string, consentGranted: boolean): Promise<void>;
+  start(tag: number, configJson: string): Promise<void>;
   /** End session `tag` (idempotent; `ended` follows as an event). */
   stop(tag: number): void;
   /** Replace session `tag`'s masks: flat `[x, y, w, h, …]` in layout units. */
   setMaskedRects(tag: number, rects: number[]): Promise<void>;
   /** Pause (or resume) guided input. */
   setPaused(tag: number, paused: boolean): void;
-  /** The SDK's consent dialog: the user's answer. */
-  requestConsent(company: string, guided: boolean, capture: string): Promise<boolean>;
+  /**
+   * The SDK's consent dialog: on YES, the library's consent token for
+   * `start` (in the config's `consent_token`); `""` when declined.
+   */
+  requestConsent(company: string, guided: boolean, capture: string): Promise<string>;
+  /** The app's own dialog said YES: the library's consent token. */
+  recordConsent(company: string, guided: boolean, capture: string): Promise<string>;
   /** The native library's build info JSON. */
   buildInfo(): Promise<string>;
 }

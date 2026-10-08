@@ -3,6 +3,7 @@ import { afterEach, test } from 'node:test';
 
 import { GaiaDeskEmbed, maskedOnScroll, requestMaskRefresh, useBridge } from '../src/embed.ts';
 import { EmbedError } from '../src/errors.ts';
+import type { Consent } from '../src/config.ts';
 import type { EmbedEvent } from '../src/events.ts';
 import { EVERYTHING, maskRegistry } from '../src/maskRegistry.ts';
 import type { Bridge, NativeEmbedModule } from '../src/native.ts';
@@ -14,7 +15,8 @@ interface Fake {
   listeners: number;
   /** What `start` does (default: resolve). */
   onStart: (tag: number) => Promise<void>;
-  consentAnswer: boolean;
+  /** The token requestConsent answers with ('' = declined). */
+  consentAnswer: string;
   buildInfo: string;
 }
 
@@ -24,7 +26,7 @@ function fake(platform = 'ios', linked = true): Fake {
     calls: [],
     listeners: 0,
     onStart: async () => {},
-    consentAnswer: true,
+    consentAnswer: 'gdc_dialog',
     buildInfo: '{"version":"0.1.0","codec":"hevc","os":"ios","arch":"arm64","test_source":false}',
     emit(tag, event) {
       for (const s of [...subs]) s({ tag, json: JSON.stringify(event) });
@@ -32,8 +34,8 @@ function fake(platform = 'ios', linked = true): Fake {
     bridge: undefined as unknown as Bridge,
   };
   const module: NativeEmbedModule = {
-    start: (tag, json, consent) => {
-      f.calls.push(['start', tag, JSON.parse(json), consent]);
+    start: (tag, json) => {
+      f.calls.push(['start', tag, JSON.parse(json)]);
       return f.onStart(tag);
     },
     stop: (tag) => {
@@ -48,6 +50,10 @@ function fake(platform = 'ios', linked = true): Fake {
     requestConsent: async (company, guided, capture) => {
       f.calls.push(['requestConsent', company, guided, capture]);
       return f.consentAnswer;
+    },
+    recordConsent: async (company, guided, capture) => {
+      f.calls.push(['recordConsent', company, guided, capture]);
+      return `gdc_${company}_${guided}_${capture}`;
     },
     buildInfo: async () => f.buildInfo,
   };
@@ -69,39 +75,63 @@ function fake(platform = 'ios', linked = true): Fake {
 
 const opts = { embedToken: 'gdemb_x', company: 'Acme' };
 
+/** A recorded YES (what an app gets after its own dialog), then the call log cleared. */
+async function yes(f: Fake, guided = false): Promise<Consent> {
+  const c = await GaiaDeskEmbed.recordConsent('Acme', { guided });
+  f.calls.length = 0;
+  return c;
+}
+
 async function refused(p: Promise<unknown>, code: string): Promise<void> {
   await assert.rejects(p, (e: unknown) => e instanceof EmbedError && e.code === code);
 }
 
 afterEach(() => useBridge(null));
 
-test('no consent, no native call', async () => {
+test('no consent, no native call; only a consent the SDK recorded counts', async () => {
   const f = fake();
-  await refused(GaiaDeskEmbed.start(opts, { consentGranted: false }), 'consent_required');
-  await refused(GaiaDeskEmbed.start(opts, { consentGranted: 'yes' as never }), 'consent_required');
+  await refused(GaiaDeskEmbed.start(opts, { consentGranted: false } as never), 'consent_required');
+  await refused(GaiaDeskEmbed.start(opts, { consentGranted: true, company: 'Acme', guided: false, capture: 'app' } as never), 'consent_required');
   await refused(GaiaDeskEmbed.start(opts, undefined as never), 'consent_required');
   assert.deepEqual(f.calls, []);
 });
 
+test('a consent is bound to what the user was asked', async () => {
+  const f = fake();
+  const viewOnly = await yes(f);
+  await refused(GaiaDeskEmbed.start({ ...opts, company: 'Other Co' }, viewOnly), 'consent_required');
+  await refused(GaiaDeskEmbed.start({ ...opts, guided: true }, viewOnly), 'consent_required');
+  assert.deepEqual(f.calls, [], 'refused before the native module');
+  assert.throws(() => {
+    (viewOnly as { guided: boolean }).guided = true;
+  }, 'frozen');
+  const s = await GaiaDeskEmbed.start(opts, viewOnly);
+  assert.equal((f.calls[0][2] as unknown as { consent_token: string }).consent_token, 'gdc_Acme_false_app', 'the native token rides in the config');
+  s.stop();
+  f.emit(s.tag, { type: 'ended', reason: 'app_stopped' });
+});
+
 test('not linked, unsupported platform, bad options', async () => {
   fake('ios', false);
-  await refused(GaiaDeskEmbed.start(opts, { consentGranted: true }), 'not_linked');
+  const ios = fake('ios');
+  const c = await yes(ios);
+  fake('ios', false);
+  await refused(GaiaDeskEmbed.start(opts, c), 'not_linked');
   fake('web');
-  await refused(GaiaDeskEmbed.start(opts, { consentGranted: true }), 'unsupported_platform');
+  await refused(GaiaDeskEmbed.start(opts, c), 'unsupported_platform');
   const f = fake('ios');
-  await refused(GaiaDeskEmbed.start({ ...opts, capture: 'screen' }, { consentGranted: true }), 'bad_config');
+  await refused(GaiaDeskEmbed.start({ ...opts, capture: 'screen' }, c), 'bad_config');
   assert.deepEqual(f.calls, []);
 });
 
 test('start maps options, tags the session and routes its events', async () => {
   const f = fake('android');
   const seen: EmbedEvent[] = [];
-  const s = await GaiaDeskEmbed.start({ ...opts, guided: true, masks: [{ x: 1, y: 2, w: 3, h: 4 }] }, { consentGranted: true }, (e) => seen.push(e));
-  const [name, tag, config, consent] = f.calls[0];
+  const s = await GaiaDeskEmbed.start({ ...opts, guided: true, masks: [{ x: 1, y: 2, w: 3, h: 4 }] }, await yes(f, true), (e) => seen.push(e));
+  const [name, tag, config] = f.calls[0];
   assert.equal(name, 'start');
   assert.equal(tag, s.tag);
-  assert.equal(consent, true);
-  assert.deepEqual(config, { embed_token: 'gdemb_x', company: 'Acme', guided: true, capture: 'app', masks: [{ x: 1, y: 2, w: 3, h: 4 }] });
+  assert.deepEqual(config, { embed_token: 'gdemb_x', company: 'Acme', guided: true, capture: 'app', consent_token: 'gdc_Acme_true_app', masks: [{ x: 1, y: 2, w: 3, h: 4 }] });
   assert.equal(GaiaDeskEmbed.current, s);
 
   f.emit(s.tag, { type: 'state', state: 'waiting' });
@@ -124,7 +154,7 @@ test('events sent while start is still pending are not lost', async () => {
     f.emit(tag, { type: 'state', state: 'starting' });
   };
   const seen: string[] = [];
-  const s = await GaiaDeskEmbed.start(opts, { consentGranted: true }, (e) => seen.push(e.type));
+  const s = await GaiaDeskEmbed.start(opts, await yes(f), (e) => seen.push(e.type));
   assert.deepEqual(seen, ['state']);
   f.emit(s.tag, { type: 'ended', reason: 'stopped' });
 });
@@ -132,7 +162,7 @@ test('events sent while start is still pending are not lost', async () => {
 test('ended resolves once; nothing follows it; stop is idempotent', async () => {
   const f = fake('ios');
   const seen: string[] = [];
-  const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+  const s = await GaiaDeskEmbed.start(opts, await yes(f));
   s.on((e) => seen.push(e.type));
   s.stop();
   s.stop();
@@ -159,7 +189,7 @@ test('ended resolves once; nothing follows it; stop is idempotent', async () => 
 
 test('listeners unsubscribe; a throwing listener does not starve the others', async () => {
   const f = fake('ios');
-  const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+  const s = await GaiaDeskEmbed.start(opts, await yes(f));
   const a: string[] = [];
   const b: string[] = [];
   const offA = s.on((e) => a.push(e.type));
@@ -180,7 +210,7 @@ test('a refused start rejects with the native code and leaves nothing running', 
   const f = fake('android');
   f.onStart = () => Promise.reject(Object.assign(new Error('a session is already running'), { code: 'busy' }));
   const seen: string[] = [];
-  await assert.rejects(GaiaDeskEmbed.start(opts, { consentGranted: true }, (e) => seen.push(e.type)), (e: unknown) => {
+  await assert.rejects(GaiaDeskEmbed.start(opts, await yes(f), (e) => seen.push(e.type)), (e: unknown) => {
     assert.ok(e instanceof EmbedError);
     assert.equal(e.code, 'busy');
     assert.equal(e.message, 'a session is already running');
@@ -197,7 +227,7 @@ test('masks: the app rects plus marked views, re-sent when a view moves', async 
   let card = { x: 20, y: 130, w: 220, h: 120 };
   const id = maskRegistry.register(async () => card);
   try {
-    const s = await GaiaDeskEmbed.start({ ...opts, masks: [{ x: 1, y: 1, w: 1, h: 1 }] }, { consentGranted: true });
+    const s = await GaiaDeskEmbed.start({ ...opts, masks: [{ x: 1, y: 1, w: 1, h: 1 }] }, await yes(f));
     // measured before start, so the first frame is covered
     assert.deepEqual((f.calls[0][2] as { masks: unknown }).masks, [
       { x: 1, y: 1, w: 1, h: 1 },
@@ -221,7 +251,7 @@ test('masks: the app rects plus marked views, re-sent when a view moves', async 
 
 test('setPaused passes through', async () => {
   const f = fake('android');
-  const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+  const s = await GaiaDeskEmbed.start(opts, await yes(f));
   s.setPaused(true);
   s.setPaused(false);
   assert.deepEqual(f.calls.slice(1), [
@@ -231,16 +261,22 @@ test('setPaused passes through', async () => {
   f.emit(s.tag, { type: 'ended', reason: 'stopped' });
 });
 
-test('requestConsent: per-platform capture, the answer as a boolean', async () => {
+test('requestConsent: per-platform capture, the YES as a Consent (null when declined)', async () => {
   let f = fake('ios');
-  assert.equal(await GaiaDeskEmbed.requestConsent('Acme', { guided: true }), true);
+  const c = await GaiaDeskEmbed.requestConsent('Acme', { guided: true });
+  assert.deepEqual(c, { consentGranted: true, company: 'Acme', guided: true, capture: 'app' });
   assert.deepEqual(f.calls, [['requestConsent', 'Acme', true, 'app']]);
+  const s = await GaiaDeskEmbed.start({ ...opts, guided: true }, c!);
+  assert.equal((f.calls[1][2] as unknown as { consent_token: string }).consent_token, 'gdc_dialog');
+  s.stop();
+  f.emit(s.tag, { type: 'ended', reason: 'app_stopped' });
   await refused(GaiaDeskEmbed.requestConsent('Acme', { capture: 'screen' }), 'bad_config');
   f = fake('android');
-  f.consentAnswer = false;
-  assert.equal(await GaiaDeskEmbed.requestConsent('Acme', { capture: 'screen' }), false);
+  f.consentAnswer = '';
+  assert.equal(await GaiaDeskEmbed.requestConsent('Acme', { capture: 'screen' }), null);
   assert.deepEqual(f.calls, [['requestConsent', 'Acme', false, 'screen']]);
   await refused(GaiaDeskEmbed.requestConsent(''), 'bad_config');
+  await refused(GaiaDeskEmbed.recordConsent(' '), 'bad_config');
 });
 
 test('buildInfo parses the native JSON', async () => {
@@ -252,8 +288,9 @@ test('buildInfo parses the native JSON', async () => {
 
 test('the bridge is subscribed once, however many sessions', async () => {
   const f = fake('ios');
+  const consents = [await yes(f), await yes(f), await yes(f)];
   for (let i = 0; i < 3; i++) {
-    const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+    const s = await GaiaDeskEmbed.start(opts, consents[i]);
     f.emit(s.tag, { type: 'ended', reason: 'stopped' });
     await s.ended;
   }
@@ -266,7 +303,7 @@ test('a marked view that does not answer before start is masked as everything', 
   const f = fake('ios');
   const id = maskRegistry.register(() => new Promise(() => {})); // e.g. mounting, not laid out yet
   try {
-    const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+    const s = await GaiaDeskEmbed.start(opts, await yes(f));
     const config = f.calls[0][2] as { masks?: unknown[] };
     assert.deepEqual(config.masks, [EVERYTHING], 'the first frame is fully masked');
     maskRegistry.set(id, { x: 5, y: 6, w: 7, h: 8 });
@@ -294,7 +331,7 @@ test('a scroll (or any trigger) re-measures the masks at once, coalesced, not on
       }),
   );
   try {
-    const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+    const s = await GaiaDeskEmbed.start(opts, await yes(f));
     assert.equal(measures, 1, 'measured at start');
     y = 300; // the user scrolled
     let theirs = 0;

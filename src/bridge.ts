@@ -20,11 +20,12 @@ export function reactNativeBridge(): Bridge {
   const spec = findModule();
   const module: NativeEmbedModule | null = spec
     ? {
-        start: (tag, json, consent) => spec.start(tag, json, consent),
+        start: (tag, json) => spec.start(tag, json),
         stop: (tag) => spec.stop(tag),
         setMaskedRects: (tag, rects) => spec.setMaskedRects(tag, rects),
         setPaused: (tag, paused) => spec.setPaused(tag, paused),
         requestConsent: (company, guided, capture) => spec.requestConsent(company, guided, capture),
+        recordConsent: (company, guided, capture) => spec.recordConsent(company, guided, capture),
         buildInfo: () => spec.buildInfo(),
       }
     : null;

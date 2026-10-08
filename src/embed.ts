@@ -2,7 +2,7 @@
 // bridge (bridge.ts) is set by index.ts, and tests set a fake one.
 
 import { checkCapture, checkRects, mobilePlatform, nativeConfig } from './config.ts';
-import type { Consent, ConsentOptions, EmbedOptions } from './config.ts';
+import type { Capture, Consent, ConsentOptions, EmbedOptions } from './config.ts';
 import { EmbedError } from './errors.ts';
 import { parsePayload } from './events.ts';
 import { maskRegistry } from './maskRegistry.ts';
@@ -18,6 +18,15 @@ export interface BuildInfo {
   codec: string;
   os: string;
   arch: string;
+}
+
+/** The library's token behind each Consent this module handed out (and only those). */
+const consentTokens = new WeakMap<Consent, string>();
+
+function issue(token: string, company: string, guided: boolean, capture: Capture): Consent {
+  const c: Consent = Object.freeze({ consentGranted: true as const, company, guided, capture });
+  consentTokens.set(c, token);
+  return c;
 }
 
 let bridgeProvider: (() => Bridge) | null = null;
@@ -146,8 +155,15 @@ export class GaiaDeskEmbed {
    *   `bad_token`, `busy`, `no_activity`, `not_linked`, …).
    */
   static async start(options: EmbedOptions, consent: Consent, onEvent?: EmbedListener): Promise<EmbedSession> {
-    if (consent?.consentGranted !== true) {
-      throw new EmbedError('consent_required', "the user's consent is required: pass { consentGranted: true } after they agreed");
+    const token = typeof consent === 'object' && consent !== null ? consentTokens.get(consent) : undefined;
+    if (token === undefined) {
+      throw new EmbedError('consent_required', "the user's consent is required: pass what requestConsent (or recordConsent, after your own dialog) returned");
+    }
+    if (options?.company !== consent.company) {
+      throw new EmbedError('consent_required', `the user agreed to share with ${JSON.stringify(consent.company)}, not ${JSON.stringify(options?.company)}`);
+    }
+    if (options.guided === true && !consent.guided) {
+      throw new EmbedError('consent_required', 'the user was not asked about guiding: ask again with { guided: true }');
     }
     const b = currentBridge();
     const platform = mobilePlatform(b.platform);
@@ -155,14 +171,14 @@ export class GaiaDeskEmbed {
     nativeConfig(options, platform);
     const module = linked(b);
     await maskRegistry.refresh();
-    const json = nativeConfig(options, platform, maskRegistry.masks());
+    const json = nativeConfig(options, platform, maskRegistry.masks(), token);
     listen(b);
     const tag = nextTag++;
     const session = new EmbedSession(tag, module, maskRegistry, checkRects(options.masks ?? []));
     if (onEvent) session.on(onEvent);
     sessions.set(tag, session);
     try {
-      await module.start(tag, json, true);
+      await module.start(tag, json);
     } catch (e) {
       sessions.delete(tag);
       session.abandon();
@@ -176,22 +192,48 @@ export class GaiaDeskEmbed {
   }
 
   /**
-   * The native SDK's consent dialog. Resolves with your user's answer; pass
-   * it to `start`. `capture: "screen"` (Android only) words it for the whole
-   * screen.
+   * The native SDK's consent dialog. Resolves with your user's YES (a
+   * `Consent` for `start`), or null when they declined. `capture: "screen"`
+   * (Android only) words it for the whole screen.
    *
    * @throws EmbedError `bad_config` (`"screen"` on iOS), `no_activity`.
    */
-  static async requestConsent(company: string, options: ConsentOptions = {}): Promise<boolean> {
+  static async requestConsent(company: string, options: ConsentOptions = {}): Promise<Consent | null> {
     const b = currentBridge();
     const platform = mobilePlatform(b.platform);
     if (typeof company !== 'string' || company.trim() === '') throw new EmbedError('bad_config', 'company must be a non-empty string');
     const capture = checkCapture(options.capture, platform);
+    const guided = options.guided === true;
+    let token: unknown;
     try {
-      return (await linked(b).requestConsent(company, options.guided === true, capture)) === true;
+      token = await linked(b).requestConsent(company, guided, capture);
     } catch (e) {
       throw EmbedError.from(e);
     }
+    return typeof token === 'string' && token !== '' ? issue(token, company, guided, capture) : null;
+  }
+
+  /**
+   * Your own consent dialog said YES: call this right then, with what it
+   * asked (the company named, whether it said the agent may guide, and
+   * `capture`). Never call it without asking.
+   *
+   * @throws EmbedError `bad_config`.
+   */
+  static async recordConsent(company: string, options: ConsentOptions = {}): Promise<Consent> {
+    const b = currentBridge();
+    const platform = mobilePlatform(b.platform);
+    if (typeof company !== 'string' || company.trim() === '') throw new EmbedError('bad_config', 'company must be a non-empty string');
+    const capture = checkCapture(options.capture, platform);
+    const guided = options.guided === true;
+    let token: unknown;
+    try {
+      token = await linked(b).recordConsent(company, guided, capture);
+    } catch (e) {
+      throw EmbedError.from(e);
+    }
+    if (typeof token !== 'string' || token === '') throw new EmbedError('consent_required', 'the native library did not record the consent');
+    return issue(token, company, guided, capture);
   }
 
   /** What the bundled native library is. */

@@ -71,15 +71,15 @@ Then, in the app:
 import { EmbedError, GaiaDeskEmbed, GaiaDeskMasked } from "@gaiadesk/embed-react-native";
 
 async function getHelp(embedToken: string) {
-  // 1. Ask (the SDK's dialog; or show your own).
-  const agreed = await GaiaDeskEmbed.requestConsent("Acme");
-  if (!agreed) return;
+  // 1. Ask (the SDK's dialog; or show your own, then GaiaDeskEmbed.recordConsent).
+  const consent = await GaiaDeskEmbed.requestConsent("Acme");
+  if (!consent) return;
 
-  // 2. Start, with the answer.
+  // 2. Start, with the user's YES.
   try {
     const help = await GaiaDeskEmbed.start(
       { embedToken, company: "Acme" },
-      { consentGranted: agreed },
+      consent,
       (e) => {
         if (e.type === "code") console.log("support code", e.code);
         if (e.type === "joined") console.log(e.agent ?? "an agent", "is viewing");
@@ -103,10 +103,13 @@ help.
 
 ## Consent is required
 
-`start` refuses (`EmbedError` with code `consent_required`) unless `consentGranted` is literally
-`true`, and that must be your user's answer to a consent dialog: `GaiaDeskEmbed.requestConsent`
-(the SDK's: a `UIAlertController` on iOS, an `AlertDialog` on Android) or your own. This package
-checks it, and the native library checks it again: that is the real gate. Say who will see what,
+`start` takes only a `Consent`: your user's YES as the native library recorded it.
+`GaiaDeskEmbed.requestConsent` (the SDK's dialog: a `UIAlertController` on iOS, an `AlertDialog`
+on Android) resolves with one, or `null` when the user declined; after your own dialog, call
+`GaiaDeskEmbed.recordConsent(company, { guided?, capture? })` when the user says yes. A consent is
+single-use, valid for 10 minutes and bound to what the user was asked: `start` refuses
+(`consent_required`) for another company, or a guided session the user was not told about. This
+package checks it, and the native library checks it again: that is the real gate. Say who will see what,
 and whether they can act. With `capture: "screen"` (Android), Android asks again with its own
 screen-capture dialog.
 
@@ -176,14 +179,15 @@ Without them the session fails with `capture_failed`. Pass `capture: "screen"` t
 
 | | |
 |---|---|
-| `GaiaDeskEmbed.start(options, { consentGranted }, onEvent?)` | `Promise<EmbedSession>`; rejects with `EmbedError` (`.code`) |
+| `GaiaDeskEmbed.start(options, consent, onEvent?)` | `Promise<EmbedSession>`; rejects with `EmbedError` (`.code`) |
 | `session.on(listener)` | listen to events; returns an unsubscribe function |
 | `session.stop()` | end the session (safe to call again); `ended` follows with `app_stopped` |
 | `session.setMaskedRects(rects)` | replace your masked rects (`{ x, y, w, h }[]`, layout units) |
 | `session.setPaused(paused)` | pause or resume guided input |
 | `session.ended` | a promise of the end reason, resolved exactly once |
 | `session.isEnded`, `session.sessionId` | whether it is over; the session id once `code` arrived |
-| `GaiaDeskEmbed.requestConsent(company, { guided?, capture? })` | `Promise<boolean>`: the SDK's consent dialog |
+| `GaiaDeskEmbed.requestConsent(company, { guided?, capture? })` | `Promise<Consent \| null>`: the SDK's consent dialog |
+| `GaiaDeskEmbed.recordConsent(company, { guided?, capture? })` | `Promise<Consent>`: your own dialog's YES |
 | `GaiaDeskEmbed.buildInfo()` | `Promise<{ version, testSource, codec, os, arch }>` of the native library |
 | `GaiaDeskEmbed.current` | the running session, if any |
 | `<GaiaDeskMasked>`, `useGaiaDeskMask()`, `refreshMasks()`, `maskedOnScroll()`, `requestMaskRefresh()` | masking (above) |

@@ -81,7 +81,11 @@ export class EmbedSession {
     await this.pushMasks();
   }
 
-  /** Pause (or resume) guided input, as the indicator's own button does. */
+  /**
+   * Pause (or resume) guided input. A pause your customer chose on the
+   * indicator is theirs: the native SDK ignores `setPaused(false)` until they
+   * lift it.
+   */
   setPaused(paused: boolean): void {
     this.native?.setPaused(this.tag, paused === true);
   }

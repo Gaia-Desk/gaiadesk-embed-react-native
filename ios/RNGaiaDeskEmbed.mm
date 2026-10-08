@@ -88,10 +88,10 @@ static void (^rejecter(RCTPromiseRejectBlock reject))(NSString *, NSString *)
   };
 }
 
-RCT_EXPORT_METHOD(start : (double)tag configJson : (NSString *)configJson consentGranted : (BOOL)consentGranted resolve : (
-    RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject)
+RCT_EXPORT_METHOD(start : (double)tag configJson : (NSString *)configJson resolve : (RCTPromiseResolveBlock)
+                      resolve reject : (RCTPromiseRejectBlock)reject)
 {
-  [_impl start:(NSInteger)tag configJson:configJson consentGranted:consentGranted resolve:resolve reject:rejecter(reject)];
+  [_impl start:(NSInteger)tag configJson:configJson resolve:resolve reject:rejecter(reject)];
 }
 
 RCT_EXPORT_METHOD(stop : (double)tag)
@@ -122,6 +122,12 @@ RCT_EXPORT_METHOD(requestConsent : (NSString *)company guided : (BOOL)guided cap
     RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject)
 {
   [_impl requestConsent:company guided:guided capture:capture resolve:resolve reject:rejecter(reject)];
+}
+
+RCT_EXPORT_METHOD(recordConsent : (NSString *)company guided : (BOOL)guided capture : (NSString *)capture resolve : (
+    RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject)
+{
+  [_impl recordConsent:company guided:guided capture:capture resolve:resolve reject:rejecter(reject)];
 }
 
 RCT_EXPORT_METHOD(buildInfo : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject)

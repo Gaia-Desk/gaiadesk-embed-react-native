@@ -18,11 +18,18 @@ public final class RNGaiaDeskEmbedImpl: NSObject {
 
     // MARK: - start / stop
 
-    @objc public func start(_ tag: Int, configJson: String, consentGranted: Bool, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String) -> Void) {
+    @objc public func start(_ tag: Int, configJson: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String) -> Void) {
         DispatchQueue.main.async {
             let config: GaiaDeskEmbed.Configuration
+            let consent: GaiaDeskEmbed.Consent
             do {
                 config = try Self.configuration(configJson)
+                // The token the SDK issued for the user's YES (JS carried it
+                // in the config); the library checks it matches this session.
+                guard let token = Self.consentToken(configJson) else {
+                    throw GaiaDeskEmbedError(code: "consent_required", message: "the user's consent is required: requestConsent or recordConsent first")
+                }
+                consent = GaiaDeskEmbed.consent(token: token, company: config.company, guided: config.guided)
             } catch let e as GaiaDeskEmbedError {
                 reject(e.code, e.message)
                 return
@@ -32,7 +39,7 @@ public final class RNGaiaDeskEmbedImpl: NSObject {
             }
             MainActor.assumeIsolated {
                 do {
-                    let embed = try GaiaDeskEmbed.start(config, consentGranted: consentGranted) { [weak self] event in
+                    let embed = try GaiaDeskEmbed.start(config, consent: consent) { [weak self] event in
                         self?.deliver(tag, event)
                     }
                     self.sessions[tag] = embed
@@ -87,15 +94,36 @@ public final class RNGaiaDeskEmbedImpl: NSObject {
 
     // MARK: - consent, build info
 
+    /// The SDK's dialog: on YES the library's consent token, "" when declined.
     @objc public func requestConsent(_ company: String, guided: Bool, capture: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String) -> Void) {
         guard capture == "app" else {
             reject("bad_config", "capture \"\(capture)\" is not available on iOS: the embed shares this app only")
             return
         }
         Task { @MainActor in
-            let agreed = await GaiaDeskEmbed.requestConsent(company: company, guided: guided)
-            resolve(agreed)
+            let consent = await GaiaDeskEmbed.requestConsent(company: company, guided: guided)
+            resolve(consent?.token ?? "")
         }
+    }
+
+    /// The app's own dialog said YES: the library's consent token.
+    @objc public func recordConsent(_ company: String, guided: Bool, capture: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String) -> Void) {
+        guard capture == "app" else {
+            reject("bad_config", "capture \"\(capture)\" is not available on iOS: the embed shares this app only")
+            return
+        }
+        do {
+            resolve(try GaiaDeskEmbed.recordConsent(company: company, guided: guided).token)
+        } catch let e as GaiaDeskEmbedError {
+            reject(e.code, e.message)
+        } catch {
+            reject("consent_required", "\(error)")
+        }
+    }
+
+    static func consentToken(_ json: String) -> String? {
+        guard let d = json.data(using: .utf8), let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let t = o["consent_token"] as? String, !t.isEmpty else { return nil }
+        return t
     }
 
     @objc public func buildInfo() -> String {

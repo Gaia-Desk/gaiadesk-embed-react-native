@@ -72,8 +72,11 @@ export default function App(): React.JSX.Element {
   const getHelp = useCallback(
     async (req: HelpRequest) => {
       try {
-        const agreed = req.testConsent || (await GaiaDeskEmbed.requestConsent(COMPANY, { guided: req.guided }));
-        if (!agreed) {
+        // test_consent=1 (automated tests only): the dialog answered "Share" unseen.
+        const consent = req.testConsent
+          ? await GaiaDeskEmbed.recordConsent(COMPANY, { guided: req.guided })
+          : await GaiaDeskEmbed.requestConsent(COMPANY, { guided: req.guided });
+        if (!consent) {
           setStatus('Nothing was shared.');
           return;
         }
@@ -85,7 +88,7 @@ export default function App(): React.JSX.Element {
             guided: req.guided,
             captureMethod: Platform.OS === 'ios' ? req.captureMethod : undefined,
           },
-          { consentGranted: agreed },
+          consent,
           onEvent,
         );
       } catch (e) {

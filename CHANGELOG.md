@@ -8,7 +8,7 @@ The first release: GaiaDesk's built-in help desk for React Native apps, over the
 - `GaiaDeskEmbed.start(options, { consentGranted }, onEvent?)` resolving to an `EmbedSession` with
   `.on()`, `.stop()`, `.setMaskedRects()`, `.setPaused()` and `.ended` (a promise of the end
   reason); refusals as `EmbedError` with a stable `code`.
-- `GaiaDeskEmbed.requestConsent(company, { guided, capture })`: the SDK's consent dialog.
+- `GaiaDeskEmbed.requestConsent(company, { guided, capture })`: the SDK's consent dialog, resolving with a single-use `Consent` (or null); `recordConsent` after your own dialog; `start` takes only a `Consent`.
 - `GaiaDeskEmbed.buildInfo()`.
 - Typed events (`state`, `code`, `joined`, `left`, `control`, `action`, `error`, `ended`) with a
   strict parser that ignores types it does not know.

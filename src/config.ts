@@ -51,9 +51,18 @@ export interface EmbedOptions {
   captureMethod?: CaptureMethod;
 }
 
-/** Your user's answer to a consent dialog. */
+/**
+ * Your user's YES to a consent dialog, as the native library recorded it
+ * (`GaiaDeskEmbed.requestConsent`, or `recordConsent` after your own dialog).
+ * Opaque: only values those functions return are accepted. Single-use,
+ * valid for 10 minutes, and a session must match it: the same company and
+ * capture, guided only if the user was asked about guiding.
+ */
 export interface Consent {
-  consentGranted: boolean;
+  readonly consentGranted: true;
+  readonly company: string;
+  readonly guided: boolean;
+  readonly capture: Capture;
 }
 
 /** What `GaiaDeskEmbed.requestConsent` takes besides the company. */
@@ -100,7 +109,7 @@ export function mobilePlatform(os: string): MobilePlatform {
  *
  * @throws EmbedError `bad_config` or `bad_rects`.
  */
-export function nativeConfig(options: EmbedOptions, platform: MobilePlatform, extraMasks: readonly Rect[] = []): string {
+export function nativeConfig(options: EmbedOptions, platform: MobilePlatform, extraMasks: readonly Rect[] = [], consentToken?: string): string {
   if (typeof options !== 'object' || options === null) throw bad('options must be an object');
   if (typeof options.embedToken !== 'string') throw bad('embedToken must be a string (gdemb_…, from your backend)');
   if (typeof options.company !== 'string' || options.company.trim() === '') throw bad('company must be a non-empty string');
@@ -115,6 +124,7 @@ export function nativeConfig(options: EmbedOptions, platform: MobilePlatform, ex
     company: options.company,
     guided: options.guided === true,
   };
+  if (consentToken !== undefined) o.consent_token = consentToken;
   if (options.server !== undefined) o.server = options.server;
   if (options.fps !== undefined) o.fps = options.fps;
   if (platform === 'android') {
