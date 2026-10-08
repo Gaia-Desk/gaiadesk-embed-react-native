@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - name: Type-check (sources and tests)
+        run: npm run typecheck
+      - name: Tests (node:test, fake native module)
+        run: npm test
+      - name: Build lib/
+        run: npm run build
+      - name: Package contents
+        run: |
+          npm pack --dry-run --json --ignore-scripts > pack.json
+          node -e '
+            const files = JSON.parse(require("fs").readFileSync("pack.json", "utf8"))[0].files.map(f => f.path);
+            const need = ["lib/index.js", "lib/index.d.ts", "src/index.ts", "GaiaDeskEmbedReactNative.podspec",
+              "android/build.gradle", "ios/RNGaiaDeskEmbed.mm", "ios/RNGaiaDeskEmbedImpl.swift", "LICENSE", "LICENSE-BINARY"];
+            const missing = need.filter(f => !files.includes(f));
+            const stray = files.filter(f => /^(example|test|node_modules)\//.test(f) || /(^|\/)build\//.test(f));
+            if (missing.length || stray.length) { console.error({ missing, stray }); process.exit(1); }
+            console.log(files.length + " files, package contents OK");'

@@ -40,6 +40,19 @@ Central, so keep `mavenCentral()` in your repositories (React Native templates h
 needs **`minSdkVersion 26`** (Android 8.0): set it in `android/build.gradle`. Nothing to add to your
 manifest unless you opt into sharing the whole screen (see Capture).
 
+### Before the SDKs are published, or against a local build
+
+- iOS: in your `ios/Podfile`, above `use_native_modules!`/`config = use_native_modules!`, add
+  `pod 'GaiaDeskEmbed', :path => '<gaiadesk-embed-ios checkout>'` (with its XCFramework in
+  `Frameworks/`: `scripts/fetch-binary.sh <version>` there).
+- Android, in your `android/gradle.properties` (or as environment variables):
+  - `GaiaDeskEmbed_embedAndroidMavenLocal=true` (`GAIADESK_EMBED_ANDROID_MAVEN_LOCAL=1`): resolve
+    `net.gaiadesk:embed-android` from `~/.m2` as well, after `./gradlew :embed:publishToMavenLocal`
+    in gaiadesk-embed-android;
+  - `GaiaDeskEmbed_embedAndroidAar=/path/to/embed-android-0.1.0.aar` (`GAIADESK_EMBED_ANDROID_AAR`):
+    that AAR file instead (e.g. the one attached to a gaiadesk-embed-android release);
+  - `GaiaDeskEmbed_embedAndroidVersion=<version>`: another published version.
+
 ## Quick start
 
 Your server creates a support session with a secret API key (scope `support`) and hands the app its
@@ -220,6 +233,19 @@ npm run build && cd example && npm install && npm run pods && npm run ios   # or
 It logs one `GaiaDeskDemo {json}` line per event. Deep links drive it:
 `acmebank://start?token=gdemb_…&server=…&guided=1&capture=snapshot` (and, for automated tests only,
 `&test_consent=1`), `acmebank://stop`, `acmebank://pause`, `acmebank://resume`.
+
+## Releasing (maintainers)
+
+Publish the native SDKs first (the `GaiaDeskEmbed` pod on CocoaPods trunk, `net.gaiadesk:embed-android`
+on Maven Central): this package only depends on them. Then, with the version bumped in
+`package.json` and `CHANGELOG.md`:
+
+```sh
+npm ci && npm run typecheck && npm test && npm pack --dry-run
+git tag v0.1.0 && git push origin main v0.1.0
+npm publish            # an npm token with publish rights on @gaiadesk; prepack builds lib/,
+                       # prepublishOnly re-runs the type-check and the tests
+```
 
 ## Licences
 

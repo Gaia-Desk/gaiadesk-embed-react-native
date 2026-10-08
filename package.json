@@ -25,7 +25,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
   "peerDependencies": {
     "react": ">=18.2.0",
@@ -57,5 +58,9 @@
   "publishConfig": {
     "access": "public"
   },
-  "keywords": ["gaiadesk", "support", "help-desk", "screen-sharing", "cobrowse", "react-native", "ios", "android", "turbo-module"]
+  "keywords": ["gaiadesk", "support", "help-desk", "screen-sharing", "cobrowse", "react-native", "ios", "android", "turbo-module"],
+  "bugs": {
+    "url": "https://github.com/Gaia-Desk/gaiadesk-embed-react-native/issues"
+  },
+  "author": "GaiaDesk <noreply@gaiadesk.net>"
 }

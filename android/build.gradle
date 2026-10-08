@@ -79,6 +79,24 @@ android {
   }
 }
 
+// net.gaiadesk:embed-android: the published AAR from Maven Central by default.
+// Overrides (the app's android/gradle.properties, rootProject.ext, or env vars):
+//   GaiaDeskEmbed_embedAndroidVersion=<v>        another published version (the
+//                                                default below is the one this release is tested with)
+//   GaiaDeskEmbed_embedAndroidMavenLocal=true    (GAIADESK_EMBED_ANDROID_MAVEN_LOCAL=1)
+//       resolve it from ~/.m2 too: `./gradlew :embed:publishToMavenLocal` in
+//       gaiadesk-embed-android (adds mavenLocal() to every project of the build)
+//   GaiaDeskEmbed_embedAndroidAar=/path/to.aar   (GAIADESK_EMBED_ANDROID_AAR)
+//       a local AAR file instead (an app build only: AGP refuses a local .aar
+//       inside this library's own AAR, so not `./gradlew assembleRelease` at the root)
+def embedAndroidVersion = getExtOrDefault("embedAndroidVersion") ?: "0.1.0"
+def embedAndroidAar = getExtOrDefault("embedAndroidAar") ?: System.getenv("GAIADESK_EMBED_ANDROID_AAR")
+def embedAndroidMavenLocal = ((getExtOrDefault("embedAndroidMavenLocal") ?: System.getenv("GAIADESK_EMBED_ANDROID_MAVEN_LOCAL")) ?: "").toString() in ["1", "true"]
+
+if (embedAndroidMavenLocal) {
+  rootProject.allprojects { repositories { mavenLocal() } }
+}
+
 repositories {
   mavenCentral()
   google()
@@ -90,7 +108,11 @@ dependencies {
   // The version comes from the app's React Native Gradle plugin.
   implementation "com.facebook.react:react-android"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-  implementation "net.gaiadesk:embed-android:0.1.0"
+  if (embedAndroidAar) {
+    implementation files(embedAndroidAar)
+  } else {
+    implementation "net.gaiadesk:embed-android:${embedAndroidVersion}"
+  }
 }
 
 if (isNewArchitectureEnabled()) {
