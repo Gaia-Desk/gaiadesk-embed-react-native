@@ -13,13 +13,20 @@ tap, or beside the GaiaDesk app, and the compiled GaiaDesk embed library
 (`libgaiadesk_embed`): the `GaiaDeskEmbedFFI` XCFramework, the
 `gaiadesk_embed` `.dll`, `.so` and `.dylib` files, and the `.node` files of
 the npm packages `@gaiadesk/embed-native-<platform>`, however they are
-distributed, including inside the `GaiaDesk.Embed` NuGet package (together,
-the "Binary"). It does not cover the open-source GaiaDesk SDKs, wrappers,
-tools, scripts and documentation (`@gaiadesk/sdk`, `@gaiadesk/mcp`,
-`gaiadesk`, `@gaiadesk/embed`, the TypeScript of `@gaiadesk/embed-native`,
-the `GaiaDeskEmbed` Swift package's and `GaiaDesk.Embed`'s sources, the
-gaiadesk-cli repository's install scripts and docs), which carry their own MIT
-licence.
+distributed, including inside the `GaiaDesk.Embed` NuGet package, and its
+mobile builds: the iOS `GaiaDeskEmbedFFI` XCFramework (and its
+`libgaiadesk_embed.a` static libraries) of the `GaiaDeskEmbed` iOS Swift
+package and CocoaPod, and the Android `libgaiadesk_embed.so` files of the
+`net.gaiadesk:embed-android` AAR, however they are distributed, including
+inside the `@gaiadesk/embed-react-native` and `gaiadesk_embed` (Flutter)
+packages' builds (together, the "Binary"). It does not cover the open-source
+GaiaDesk SDKs, wrappers, tools, scripts and documentation (`@gaiadesk/sdk`,
+`@gaiadesk/mcp`, `gaiadesk`, `@gaiadesk/embed`, the TypeScript of
+`@gaiadesk/embed-native`, the `GaiaDeskEmbed` Swift packages' (macOS and iOS)
+and `GaiaDesk.Embed`'s sources, the Kotlin sources of
+`net.gaiadesk:embed-android`, `@gaiadesk/embed-react-native` and the
+`gaiadesk_embed` Flutter plugin, the gaiadesk-cli repository's install scripts
+and docs), which carry their own MIT licence.
 
 1. Grant. You may install, copy and run the Binary, free of charge, solely to
    use GaiaDesk services and software: in your own programs, scripts, agents
