@@ -35,8 +35,44 @@ function pollMasks(): void {
   if (poll) return;
   poll = setInterval(() => {
     if (sessions.size === 0) stopPolling();
-    else if (maskRegistry.size > 0) void maskRegistry.refresh();
+    else requestMaskRefresh();
   }, MASK_REFRESH_MS);
+}
+
+let refreshing = false;
+let again = false;
+
+/**
+ * Measure the marked views again as soon as possible: on a scroll, a layout
+ * change, the keyboard, a rotation (and on the poll, which catches the
+ * rest). Coalesced: one measurement in flight, at most one more queued.
+ * Nothing to do when no session runs.
+ */
+export function requestMaskRefresh(): void {
+  if (sessions.size === 0 || maskRegistry.size === 0) return;
+  if (refreshing) {
+    again = true;
+    return;
+  }
+  refreshing = true;
+  void maskRegistry.refresh().finally(() => {
+    refreshing = false;
+    if (again) {
+      again = false;
+      requestMaskRefresh();
+    }
+  });
+}
+
+/**
+ * An `onScroll` for your ScrollView / FlatList: the masks inside it follow
+ * the scroll at once. Calls your own handler too.
+ */
+export function maskedOnScroll<E>(handler?: (event: E) => void): (event: E) => void {
+  return (event: E) => {
+    requestMaskRefresh();
+    handler?.(event);
+  };
 }
 
 function stopPolling(): void {
@@ -119,7 +155,7 @@ export class GaiaDeskEmbed {
     nativeConfig(options, platform);
     const module = linked(b);
     await maskRegistry.refresh();
-    const json = nativeConfig(options, platform, maskRegistry.all());
+    const json = nativeConfig(options, platform, maskRegistry.masks());
     listen(b);
     const tag = nextTag++;
     const session = new EmbedSession(tag, module, maskRegistry, checkRects(options.masks ?? []));

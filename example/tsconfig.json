@@ -3,8 +3,16 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "paths": {
-      "@gaiadesk/embed-react-native": ["../src/index.ts"]
-    }
+      "@gaiadesk/embed-react-native": [
+        "../src/index.ts"
+      ]
+    },
+    "types": [
+      "react-native"
+    ]
   },
-  "include": ["App.tsx", "index.ts"]
+  "include": [
+    "App.tsx",
+    "index.ts"
+  ]
 }

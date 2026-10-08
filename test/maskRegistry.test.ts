@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Rect } from '../src/config.ts';
-import { MaskRegistry } from '../src/maskRegistry.ts';
+import { EVERYTHING, MaskRegistry } from '../src/maskRegistry.ts';
 
 test('set, change and unregister notify; same rect does not', () => {
   const r = new MaskRegistry();
@@ -54,4 +54,32 @@ test('refresh measures every view; a failing or late one keeps its last rect', a
   assert.equal(r.size, 3);
   r.unregister(a);
   assert.equal(r.size, 2);
+});
+
+test('a registered view not measured yet masks everything until it is (fail closed)', () => {
+  const r = new MaskRegistry();
+  assert.deepEqual(r.masks(), []);
+  let n = 0;
+  r.subscribe(() => n++);
+  const id = r.register(() => new Promise<Rect | null>(() => {}));
+  assert.equal(r.hasUnmeasured, true);
+  assert.deepEqual(r.masks(), [EVERYTHING]);
+  r.set(id, { x: Number.NaN, y: 0, w: 1, h: 1 }); // no answer yet
+  assert.deepEqual(r.masks(), [EVERYTHING]);
+  r.set(id, { x: 1, y: 2, w: 3, h: 4 });
+  assert.equal(n, 1, 'measured: the masks change');
+  assert.deepEqual(r.masks(), [{ x: 1, y: 2, w: 3, h: 4 }]);
+  const off = r.register(async () => null);
+  assert.deepEqual(r.masks(), [EVERYTHING, { x: 1, y: 2, w: 3, h: 4 }]);
+  r.set(off, null); // measured: not on screen
+  assert.equal(n, 2);
+  assert.deepEqual(r.masks(), [{ x: 1, y: 2, w: 3, h: 4 }]);
+  const gone = r.register(() => new Promise<Rect | null>(() => {}));
+  r.unregister(gone); // never measured, now unmounted: everything is no longer masked
+  assert.equal(n, 3);
+  assert.deepEqual(r.masks(), [{ x: 1, y: 2, w: 3, h: 4 }]);
+});
+
+test('EVERYTHING covers any window', () => {
+  assert.ok(EVERYTHING.x <= -10000 && EVERYTHING.y <= -10000 && EVERYTHING.x + EVERYTHING.w >= 100000 && EVERYTHING.y + EVERYTHING.h >= 100000);
 });

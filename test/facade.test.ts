@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { GaiaDeskEmbed, useBridge } from '../src/embed.ts';
+import { GaiaDeskEmbed, maskedOnScroll, requestMaskRefresh, useBridge } from '../src/embed.ts';
 import { EmbedError } from '../src/errors.ts';
 import type { EmbedEvent } from '../src/events.ts';
-import { maskRegistry } from '../src/maskRegistry.ts';
+import { EVERYTHING, maskRegistry } from '../src/maskRegistry.ts';
 import type { Bridge, NativeEmbedModule } from '../src/native.ts';
 
 interface Fake {
@@ -260,4 +260,61 @@ test('the bridge is subscribed once, however many sessions', async () => {
   assert.equal(f.listeners, 1);
   const tags = f.calls.filter((c) => c[0] === 'start').map((c) => c[1]);
   assert.equal(new Set(tags).size, 3);
+});
+
+test('a marked view that does not answer before start is masked as everything', async () => {
+  const f = fake('ios');
+  const id = maskRegistry.register(() => new Promise(() => {})); // e.g. mounting, not laid out yet
+  try {
+    const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+    const config = f.calls[0][2] as { masks?: unknown[] };
+    assert.deepEqual(config.masks, [EVERYTHING], 'the first frame is fully masked');
+    maskRegistry.set(id, { x: 5, y: 6, w: 7, h: 8 });
+    const pushed = f.calls.filter((c) => c[0] === 'setMaskedRects').at(-1);
+    assert.deepEqual(pushed?.[2], [5, 6, 7, 8], 'measured: just the view');
+    s.stop();
+    f.emit(s.tag, { type: 'ended', reason: 'app_stopped' });
+  } finally {
+    maskRegistry.unregister(id);
+  }
+});
+
+test('a scroll (or any trigger) re-measures the masks at once, coalesced, not on the poll', async () => {
+  const f = fake('ios');
+  let measures = 0;
+  let y = 100;
+  let release: (() => void) | null = null;
+  const id = maskRegistry.register(
+    () =>
+      new Promise((resolve) => {
+        measures++;
+        const r = { x: 0, y, w: 50, h: 20 };
+        if (measures === 2) release = () => resolve(r); // the first refresh after start is slow
+        else resolve(r);
+      }),
+  );
+  try {
+    const s = await GaiaDeskEmbed.start(opts, { consentGranted: true });
+    assert.equal(measures, 1, 'measured at start');
+    y = 300; // the user scrolled
+    let theirs = 0;
+    const onScroll = maskedOnScroll(() => theirs++);
+    onScroll({});
+    assert.equal(theirs, 1, "the app's own handler still runs");
+    assert.equal(measures, 2, 'measured on the scroll, not 500 ms later');
+    requestMaskRefresh();
+    requestMaskRefresh();
+    assert.equal(measures, 2, 'one in flight; the rest queued as one');
+    release!();
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(measures, 3, 'the queued one ran once');
+    const pushed = f.calls.filter((c) => c[0] === 'setMaskedRects').at(-1);
+    assert.deepEqual(pushed?.[2], [0, 300, 50, 20], 'the mask followed the scroll');
+    s.stop();
+    f.emit(s.tag, { type: 'ended', reason: 'app_stopped' });
+    requestMaskRefresh();
+    assert.equal(measures, 3, 'no session: nothing measured');
+  } finally {
+    maskRegistry.unregister(id);
+  }
 });

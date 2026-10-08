@@ -5,6 +5,12 @@
 
 import type { Rect } from './config.ts';
 
+/**
+ * Covers the whole window, whatever its size: what is masked while a marked
+ * view has not been measured yet (the library clips it to the picture).
+ */
+export const EVERYTHING: Readonly<Rect> = Object.freeze({ x: -100000, y: -100000, w: 300000, h: 300000 });
+
 /** Measures one view: its rect in the window, or null when it is not on screen. */
 export type Measure = () => Promise<Rect | null>;
 
@@ -14,6 +20,8 @@ const same = (a: Rect | undefined, b: Rect | null): boolean =>
 export class MaskRegistry {
   private readonly rectsById = new Map<number, Rect>();
   private readonly measurers = new Map<number, Measure>();
+  /** Views that have had an answer (a rect, or null: not on screen). */
+  private readonly measured = new Set<number>();
   private readonly listeners = new Set<() => void>();
   private nextId = 1;
 
@@ -27,7 +35,8 @@ export class MaskRegistry {
   /** Remove a view (it unmounted): its rect stops being masked. */
   unregister(id: number): void {
     this.measurers.delete(id);
-    if (this.rectsById.delete(id)) this.notify();
+    const wasUnmeasured = !this.measured.delete(id);
+    if (this.rectsById.delete(id) || wasUnmeasured) this.notify();
   }
 
   /** A view's new rect (null: not on screen). Ignored for an unregistered id. */
@@ -35,7 +44,12 @@ export class MaskRegistry {
     if (!this.measurers.has(id)) return;
     const valid = rect !== null && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w >= 0 && rect.h >= 0;
     const next = valid ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null;
-    if (same(this.rectsById.get(id), next)) return;
+    // An invalid measurement is no answer: the view stays unmeasured (masked
+    // as everything) until a real one comes.
+    if (rect !== null && !valid && !this.measured.has(id)) return;
+    const first = !this.measured.has(id);
+    this.measured.add(id);
+    if (!first && same(this.rectsById.get(id), next)) return;
     if (next) this.rectsById.set(id, next);
     else this.rectsById.delete(id);
     this.notify();
@@ -44,6 +58,21 @@ export class MaskRegistry {
   /** Every masked view's rect. */
   all(): Rect[] {
     return [...this.rectsById.values()];
+  }
+
+  /** Whether a registered view has not been measured yet. */
+  get hasUnmeasured(): boolean {
+    for (const id of this.measurers.keys()) if (!this.measured.has(id)) return true;
+    return false;
+  }
+
+  /**
+   * What to mask for the marked views: their rects, or the whole window
+   * while any of them has not been measured yet (fail closed: a view that
+   * is about to appear is never shown unmasked).
+   */
+  masks(): Rect[] {
+    return this.hasUnmeasured ? [{ ...EVERYTHING }, ...this.all()] : this.all();
   }
 
   /** How many views are registered (measured or not). */

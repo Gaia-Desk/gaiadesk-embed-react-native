@@ -123,8 +123,12 @@ them.
   earlier set; `[]` clears it. Marked views stay masked on top.
 
 Marked views are measured with `measureInWindow` when they lay out, right before `start` (so they
-cover the very first frame), and every 500 ms while a session runs (a scroll moves views without a
-layout). Call `refreshMasks()` after a change you want covered at once. Units are React Native
+cover the very first frame), again at once on any marked view's layout, the keyboard, a rotation or
+the app coming back, and every 500 ms while a session runs. A scroll moves views without a layout:
+give your `ScrollView` / `FlatList` `onScroll={maskedOnScroll(yourHandler)}` (and
+`scrollEventThrottle={16}`) so the masks inside it follow at once; `requestMaskRefresh()` does the
+same from anywhere. A marked view that has not been measured yet (still mounting, or its
+measurement did not answer) masks the **whole** picture until it is: masks fail closed. Units are React Native
 layout units: points on iOS (what the SDK takes), dp on Android (the native module multiplies by the
 display density and adds the visible frame's offset in the window, rounding outward).
 
@@ -182,7 +186,7 @@ Without them the session fails with `capture_failed`. Pass `capture: "screen"` t
 | `GaiaDeskEmbed.requestConsent(company, { guided?, capture? })` | `Promise<boolean>`: the SDK's consent dialog |
 | `GaiaDeskEmbed.buildInfo()` | `Promise<{ version, testSource, codec, os, arch }>` of the native library |
 | `GaiaDeskEmbed.current` | the running session, if any |
-| `<GaiaDeskMasked>`, `useGaiaDeskMask()`, `refreshMasks()` | masking (above) |
+| `<GaiaDeskMasked>`, `useGaiaDeskMask()`, `refreshMasks()`, `maskedOnScroll()`, `requestMaskRefresh()` | masking (above) |
 
 | Option | |
 |---|---|
@@ -222,13 +226,21 @@ npm run typecheck
 npm run build       # lib/
 ```
 
-The example (create its native projects first: `npx @react-native-community/cli init AcmeBank
---version 0.76.9`, then copy `ios/` and `android/` into `example/`, add the `acmebank` URL scheme
-and set Android `minSdkVersion` 26):
+The example (React Native 0.76.9; `example/ios` is the CLI's template plus the `acmebank` URL
+scheme, deep links reaching JS, and test hooks):
 
 ```sh
 npm run build && cd example && npm install && npm run pods && npm run ios   # or: npm run android
 ```
+
+Before the GaiaDeskEmbed pod is on trunk, point the pods at a checkout of gaiadesk-embed-ios with its
+XCFramework in `Frameworks/`: `GAIADESK_EMBED_IOS_PATH=<checkout> pod install` in `example/ios`
+(`RCT_NEW_ARCH_ENABLED=0` for the old architecture; both are tested). A simulator build needs a
+simulator slice for every architecture built (`ARCHS=arm64` with a debug arm64-only XCFramework).
+GaiaDesk's `e2e/embed-rn-ios-sim.mts` drives the Release build end to end in the iOS Simulator (its
+AppDelegate prints the `GaiaDeskDemo` lines on stdout with `GAIADESK_DEMO_LOG=1` and takes deep links
+from `<app tmp>/gaiadesk-demo-cmd` with `GAIADESK_DEMO_CMD=1`, since the Simulator asks before
+opening a URL).
 
 It logs one `GaiaDeskDemo {json}` line per event. Deep links drive it:
 `acmebank://start?token=gdemb_…&server=…&guided=1&capture=snapshot` (and, for automated tests only,

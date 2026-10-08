@@ -78,6 +78,7 @@ RCT_EXPORT_MODULE(GaiaDeskEmbed)
 {
   [_impl stopAll];
   _observing = NO;
+  [super invalidate];
 }
 
 static void (^rejecter(RCTPromiseRejectBlock reject))(NSString *, NSString *)

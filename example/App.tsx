@@ -14,10 +14,12 @@
 //   acmebank://start?token=…&server=…&guided=1&test_consent=1&capture=snapshot|replayKit
 //       press Get help (test_consent=1 answers the consent dialog "Share": tests only)
 //   acmebank://stop, acmebank://pause, acmebank://resume
-// Every event is logged as one JSON line prefixed `GaiaDeskDemo `.
+// Every event is logged as one JSON line prefixed `GaiaDeskDemo `; the first,
+// `{"type":"demo",…}`, also gives the window's size and where the card, the
+// blue box and Buy are in it (layout units), for the end-to-end tests.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, Linking, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { EmbedError, GaiaDeskEmbed, GaiaDeskMasked } from '@gaiadesk/embed-react-native';
 import type { CaptureMethod, EmbedEvent, EmbedSession } from '@gaiadesk/embed-react-native';
@@ -55,6 +57,7 @@ export default function App(): React.JSX.Element {
   const [status, setStatus] = useState(`Press Get help to share this app with ${COMPANY} support.`);
   const [bought, setBought] = useState(0);
   const help = useRef<EmbedSession | null>(null);
+  const boxes = useRef<Record<'card' | 'blue' | 'buy', View | null>>({ card: null, blue: null, buy: null });
 
   const onEvent = useCallback((e: EmbedEvent) => {
     emit(e);
@@ -95,10 +98,16 @@ export default function App(): React.JSX.Element {
   );
 
   useEffect(() => {
-    GaiaDeskEmbed.buildInfo().then(
-      (build) => emit({ type: 'demo', build }),
-      (e: unknown) => emit({ type: 'demo', build_error: String(e) }),
-    );
+    const box = (v: View | null): Promise<number[] | null> =>
+      new Promise((resolve) => (v ? v.measureInWindow((x, y, w, h) => resolve([x, y, w, h])) : resolve(null)));
+    // After the first layout: the boxes are measured in the window.
+    const t = setTimeout(() => {
+      const { width, height } = Dimensions.get('window');
+      Promise.all([GaiaDeskEmbed.buildInfo(), box(boxes.current.card), box(boxes.current.blue), box(boxes.current.buy)]).then(
+        ([build, card, blue, buy]) => emit({ type: 'demo', build, frame: [width, height], card, blue, buy }),
+        (e: unknown) => emit({ type: 'demo', build_error: String(e) }),
+      );
+    }, 500);
     const handle = (url: string | null): void => {
       const link = url ? parseLink(url) : null;
       if (!link) return;
@@ -120,19 +129,25 @@ export default function App(): React.JSX.Element {
     };
     Linking.getInitialURL().then(handle, () => {});
     const sub = Linking.addEventListener('url', ({ url }) => handle(url));
-    return () => sub.remove();
+    return () => {
+      clearTimeout(t);
+      sub.remove();
+    };
   }, [getHelp]);
 
   return (
     <SafeAreaView style={styles.screen}>
       <Text style={styles.title}>Acme Bank</Text>
       <View style={styles.row}>
-        <GaiaDeskMasked style={styles.card} testID="card">
-          <Text style={styles.cardText}>Card 4242 4242 4242 4242</Text>
-        </GaiaDeskMasked>
-        <View style={styles.blue} testID="blue" />
+        <View ref={(v) => (boxes.current.card = v)} collapsable={false}>
+          <GaiaDeskMasked style={styles.card} testID="card">
+            <Text style={styles.cardText}>Card 4242 4242 4242 4242</Text>
+          </GaiaDeskMasked>
+        </View>
+        <View ref={(v) => (boxes.current.blue = v)} style={styles.blue} testID="blue" />
       </View>
       <Pressable
+        ref={(v) => (boxes.current.buy = v)}
         style={styles.button}
         testID="buy"
         onPress={() => {

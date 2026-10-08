@@ -88,7 +88,7 @@ export class EmbedSession {
 
   /** The rects sent to the library: the app's plus the marked views'. */
   currentMasks(): Rect[] {
-    return [...this.appRects, ...this.registry.all()];
+    return [...this.appRects, ...this.registry.masks()];
   }
 
   private async pushMasks(): Promise<void> {

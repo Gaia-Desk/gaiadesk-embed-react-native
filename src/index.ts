@@ -11,10 +11,12 @@
 
 import { reactNativeBridge } from './bridge.ts';
 import { setBridgeProvider } from './embed.ts';
+import { installMaskTriggers } from './triggers.ts';
 
 setBridgeProvider(reactNativeBridge);
+installMaskTriggers();
 
-export { GaiaDeskEmbed, MASK_REFRESH_MS, useBridge } from './embed.ts';
+export { GaiaDeskEmbed, MASK_REFRESH_MS, maskedOnScroll, requestMaskRefresh, useBridge } from './embed.ts';
 export type { BuildInfo } from './embed.ts';
 export { EmbedSession } from './session.ts';
 export type { EmbedListener } from './session.ts';

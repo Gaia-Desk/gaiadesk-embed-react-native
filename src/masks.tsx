@@ -10,6 +10,7 @@ import type { LayoutChangeEvent, ViewProps } from 'react-native';
 
 import type { Rect } from './config.ts';
 import { maskRegistry } from './maskRegistry.ts';
+import { requestMaskRefresh } from './embed.ts';
 
 /** Anything with `measureInWindow` (every host component instance). */
 export interface Measurable {
@@ -88,6 +89,8 @@ export function GaiaDeskMasked(props: ViewProps): React.JSX.Element {
   const layout = useCallback(
     (e: LayoutChangeEvent) => {
       measure();
+      // A layout change here often moves other marked views too.
+      requestMaskRefresh();
       onLayout?.(e);
     },
     [measure, onLayout],
