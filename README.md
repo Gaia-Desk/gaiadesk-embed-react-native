@@ -1,8 +1,14 @@
 # @gaiadesk/embed-react-native
 
-A **"Get help" button for your React Native app**. Your customer taps it and agrees; your app's
-screen is shared with **your** support team, who see it in the GaiaDesk console's Support page
-and, if you allow it, guide it: tap, scroll and type **inside your app only**.
+[![CI](https://github.com/Gaia-Desk/gaiadesk-embed-react-native/actions/workflows/ci.yml/badge.svg)](https://github.com/Gaia-Desk/gaiadesk-embed-react-native/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Gaia-Desk/gaiadesk-embed-react-native)](https://github.com/Gaia-Desk/gaiadesk-embed-react-native/releases/latest)
+[![License: MIT + binary licence](https://img.shields.io/badge/license-MIT%20%2B%20binary%20licence-blue)](#licences)
+
+A **"Get help" button for your React Native app**: in-app remote support and a screen sharing SDK
+for React Native on iOS and Android, for customer support with optional guided control. Your
+customer taps it and agrees; your app's screen is shared with **your** support team, who see it in
+the GaiaDesk console's Support page and, if you allow it, guide it: tap, scroll and type **inside
+your app only**.
 
 - TypeScript, typed events, no JS dependencies. A TurboModule under the new architecture, a
   classic native module under the old one.
@@ -16,18 +22,39 @@ and, if you allow it, guide it: tap, scroll and type **inside your app only**.
 - View-only unless you opt in; guided input is delivered inside your app, never through the
   system's input stream.
 
+## Install
+
+**Not on npm yet.** This package waits for the native SDKs it depends on: the `GaiaDeskEmbed` pod
+(CocoaPods trunk) and `net.gaiadesk:embed-android` (Maven Central). Once all three are published:
+
 ```sh
 npm install @gaiadesk/embed-react-native
+cd ios && pod install
 ```
 
 React Native 0.74 or later (new or old architecture). Not available in Expo Go (it is native
 code); in an Expo app use a development build.
 
-### iOS
+### Until then: from source, with the native SDKs from their GitHub releases
+
+`npm install github:Gaia-Desk/gaiadesk-embed-react-native` does **not** work: `lib/` is built when
+the package is packed and is not in git. Pack it from a checkout of the tag instead:
 
 ```sh
-cd ios && pod install
+git clone --branch v0.1.0 https://github.com/Gaia-Desk/gaiadesk-embed-react-native.git
+cd gaiadesk-embed-react-native && npm ci && npm pack     # → gaiadesk-embed-react-native-0.1.0.tgz
+cd <your app> && npm install <path>/gaiadesk-embed-react-native-0.1.0.tgz
 ```
+
+- **iOS**: in your `ios/Podfile`, inside the app target and above `use_native_modules!`, add
+  `pod 'GaiaDeskEmbed', :podspec => 'https://raw.githubusercontent.com/Gaia-Desk/gaiadesk-embed-ios/v0.1.0/GaiaDeskEmbed.podspec'`,
+  then `pod install`.
+- **Android**: download `embed-android-0.1.0.aar` from the
+  [gaiadesk-embed-android release](https://github.com/Gaia-Desk/gaiadesk-embed-android/releases/tag/v0.1.0)
+  and set `GaiaDeskEmbed_embedAndroidAar=/path/to/embed-android-0.1.0.aar` in your
+  `android/gradle.properties` (see below).
+
+### iOS
 
 `pod install` pulls the `GaiaDeskEmbed` pod (the Swift SDK and its prebuilt
 `GaiaDeskEmbedFFI.xcframework`) through this package's `GaiaDeskEmbedReactNative` pod. iOS 15.1 or
@@ -36,11 +63,12 @@ later. The app's own screen only, always (see Capture).
 ### Android
 
 Autolinking adds the module; it depends on **`net.gaiadesk:embed-android:0.1.0`** from Maven
-Central, so keep `mavenCentral()` in your repositories (React Native templates have it). The SDK
-needs **`minSdkVersion 26`** (Android 8.0): set it in `android/build.gradle`. Nothing to add to your
-manifest unless you opt into sharing the whole screen (see Capture).
+Central (once published there), so keep `mavenCentral()` in your repositories (React Native
+templates have it). The SDK needs **`minSdkVersion 26`** (Android 8.0): set it in
+`android/build.gradle`. Nothing to add to your manifest unless you opt into sharing the whole
+screen (see Capture).
 
-### Before the SDKs are published, or against a local build
+### Native SDK overrides (GitHub releases or local builds)
 
 - iOS: in your `ios/Podfile`, above `use_native_modules!`/`config = use_native_modules!`, add
   `pod 'GaiaDeskEmbed', :path => '<gaiadesk-embed-ios checkout>'` (with its XCFramework in
@@ -272,6 +300,13 @@ git tag v0.1.0 && git push origin main v0.1.0
 npm publish            # an npm token with publish rights on @gaiadesk; prepack builds lib/,
                        # prepublishOnly re-runs the type-check and the tests
 ```
+
+## Links
+
+- npm: `@gaiadesk/embed-react-native` is not published yet (it waits for the native SDKs: the [iOS pod](https://github.com/Gaia-Desk/gaiadesk-embed-ios) and the [Android AAR](https://github.com/Gaia-Desk/gaiadesk-embed-android))
+- Guide: [Embedding GaiaDesk](https://gaiadesk.net/docs/embedding-gaiadesk) on gaiadesk.net
+- Embed SDKs: [Web](https://github.com/Gaia-Desk/gaiadesk-embed) · [Electron](https://github.com/Gaia-Desk/gaiadesk-embed-electron) · [macOS (Swift)](https://github.com/Gaia-Desk/gaiadesk-embed-swift) · [C/C++ and Qt](https://github.com/Gaia-Desk/gaiadesk-embed-cpp) · [.NET](https://github.com/Gaia-Desk/gaiadesk-embed-dotnet) · [iOS](https://github.com/Gaia-Desk/gaiadesk-embed-ios) · [Android](https://github.com/Gaia-Desk/gaiadesk-embed-android) · [React Native](https://github.com/Gaia-Desk/gaiadesk-embed-react-native) · [Flutter](https://github.com/Gaia-Desk/gaiadesk-embed-flutter)
+- [Changelog](CHANGELOG.md) · [Security policy](https://github.com/Gaia-Desk/.github/blob/main/SECURITY.md)
 
 ## Licences
 
