@@ -50,7 +50,7 @@
       "javaPackageName": "net.gaiadesk.reactnative"
     }
   },
-  "homepage": "https://gaiadesk.net/docs/embed",
+  "homepage": "https://gaiadesk.net/docs/embedding-gaiadesk",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Gaia-Desk/gaiadesk-embed-react-native.git"
